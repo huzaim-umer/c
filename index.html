@@ -3,7 +3,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebRTC Screen Share (Manual SDP, Multi-session)</title>
+  <title>WebRTC Screen Share (Manual SDP, Multi-session, Debug)</title>
   <style>
     body {
       font-family: sans-serif;
@@ -45,7 +45,7 @@
   </style>
 </head>
 <body>
-  <h2>WebRTC Screen Share (Manual SDP, Multi-session)</h2>
+  <h2>WebRTC Screen Share (Manual SDP, Multi-session, Debug)</h2>
 
   <div id="sender">
     <button id="startShare">Start Screen Share</button>
@@ -68,6 +68,7 @@
   <script>
     const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     let pcSender = null, pcReceiver = null;
+    let stream = null; // Global stream variable for debug and reuse
 
     // Utility to reset PeerConnection and stop tracks
     function resetPC(pc) {
@@ -82,9 +83,11 @@
     // Sender side
     document.getElementById('startShare').onclick = async () => {
       pcSender = resetPC(pcSender);  // Close old connection if exists
-      pcSender = new RTCPeerConnection(config);
 
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      pcSender = new RTCPeerConnection(config);
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      console.log('Captured stream:', stream); // Debug
+
       stream.getTracks().forEach(t => pcSender.addTrack(t, stream));
 
       pcSender.onicecandidate = e => {
@@ -109,6 +112,7 @@
       pcReceiver = new RTCPeerConnection(config);
 
       pcReceiver.ontrack = e => {
+        console.log('Track received on receiver:', e.streams[0]); // Debug
         document.getElementById('remoteVideo').srcObject = e.streams[0];
       };
 
