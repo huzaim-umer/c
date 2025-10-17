@@ -1,8 +1,9 @@
 <!DOCTYPE html>
+
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebRTC Screen Share (Manual SDP)</title>
+  <title>WebRTC Screen Share (Manual SDP, Multi-session)</title>
   <style>
     body {
       font-family: sans-serif;
@@ -44,7 +45,7 @@
   </style>
 </head>
 <body>
-  <h2>WebRTC Screen Share (Manual SDP)</h2>
+  <h2>WebRTC Screen Share (Manual SDP, Multi-session)</h2>
 
   <div id="sender">
     <button id="startShare">Start Screen Share</button>
@@ -66,22 +67,37 @@
 
   <script>
     const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    let pcSender, pcReceiver;
+    let pcSender = null, pcReceiver = null;
+
+    // Utility to reset PeerConnection and stop tracks
+    function resetPC(pc) {
+      if(pc) {
+        pc.getSenders().forEach(s => s.track && s.track.stop());
+        pc.close();
+        return null;
+      }
+      return pc;
+    }
 
     // Sender side
     document.getElementById('startShare').onclick = async () => {
+      pcSender = resetPC(pcSender);  // Close old connection if exists
       pcSender = new RTCPeerConnection(config);
+
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       stream.getTracks().forEach(t => pcSender.addTrack(t, stream));
+
       pcSender.onicecandidate = e => {
         if (e.candidate) return;
         document.getElementById('offer').value = JSON.stringify(pcSender.localDescription);
       };
+
       const offer = await pcSender.createOffer();
       await pcSender.setLocalDescription(offer);
     };
 
     document.getElementById('setAnswer').onclick = async () => {
+      if(!pcSender) { alert('Start screen share first!'); return; }
       const answer = JSON.parse(document.getElementById('answer').value);
       await pcSender.setRemoteDescription(answer);
       alert('✅ Connection established!');
@@ -89,19 +105,25 @@
 
     // Receiver side
     document.getElementById('createAnswer').onclick = async () => {
+      pcReceiver = resetPC(pcReceiver);  // Close old connection if exists
       pcReceiver = new RTCPeerConnection(config);
+
       pcReceiver.ontrack = e => {
         document.getElementById('remoteVideo').srcObject = e.streams[0];
       };
+
       const offer = JSON.parse(document.getElementById('remoteOffer').value);
       await pcReceiver.setRemoteDescription(offer);
+
       const answer = await pcReceiver.createAnswer();
       await pcReceiver.setLocalDescription(answer);
+
       pcReceiver.onicecandidate = e => {
         if (e.candidate) return;
         document.getElementById('localAnswer').value = JSON.stringify(pcReceiver.localDescription);
       };
     };
   </script>
+
 </body>
 </html>
