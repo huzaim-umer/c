@@ -218,22 +218,23 @@
         <div id="broadcasterStatus"></div>
       </div>
 
-      <div class="section" id="offerSection" style="display: none;">
-        <h3><span class="step-number">2</span> Share This Offer Code</h3>
+      <div class="section" id="generateOfferSection" style="display: none;">
+        <h3><span class="step-number">2</span> Generate Offer for Viewer</h3>
         <div class="alert alert-info">
-          📋 Copy this code and share it with viewers (via chat, email, etc.)
+          🔄 Each viewer needs a unique offer. Click the button below to generate an offer code for a viewer.
         </div>
-        <textarea id="offerCode" readonly></textarea>
-        <button class="copy-btn" onclick="copyToClipboard('offerCode')">📋 Copy Offer</button>
+        <button onclick="generateOfferForViewer()">🎫 Generate New Offer</button>
+        <textarea id="generatedOffer" readonly style="display: none;"></textarea>
+        <button class="copy-btn" onclick="copyToClipboard('generatedOffer')" style="display: none;" id="copyOfferBtn">📋 Copy Offer</button>
       </div>
 
       <div class="section" id="answersSection" style="display: none;">
-        <h3><span class="step-number">3</span> Add Viewer Answers</h3>
+        <h3><span class="step-number">3</span> Receive Viewer Answer</h3>
         <div class="alert alert-info">
-          🔗 When viewers send you their answer codes, paste them here one at a time
+          🔗 When a viewer sends you their answer code, paste it here to complete the connection.
         </div>
         <textarea id="viewerAnswer" placeholder="Paste viewer's answer code here..."></textarea>
-        <button onclick="addViewer()">➕ Connect Viewer</button>
+        <button onclick="connectViewer()">➕ Connect This Viewer</button>
         
         <div class="viewer-list" id="viewerList" style="display: none;">
           <strong>Connected Viewers:</strong>
@@ -265,7 +266,7 @@
           📥 Get the offer code from the broadcaster and paste it below
         </div>
         <textarea id="broadcasterOffer" placeholder="Paste offer code here..."></textarea>
-        <button onclick="connectToBroadcast()">🔗 Connect to Broadcast</button>
+        <button onclick="connectToBroadcast()">🔗 Generate Answer</button>
       </div>
 
       <div class="section" id="answerSection" style="display: none;">
@@ -298,10 +299,8 @@
 
   <script>
     const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    let broadcasterPC = null;
     let localStream = null;
-    const viewerConnections = [];
-    let viewerPC = null;
+    const viewerConnections = new Map(); // Map to store pending and active connections
     let viewerCounter = 0;
 
     // Mode switching
@@ -317,7 +316,7 @@
     document.getElementById('startBroadcast').onclick = async () => {
       try {
         localStream = await navigator.mediaDevices.getDisplayMedia({ 
-          video: { displaySurface: 'monitor' }, 
+          video: true, 
           audio: true 
         });
 
@@ -334,16 +333,13 @@
           stopBroadcasting();
         });
 
-        // Create offer for viewers
-        await createBroadcastOffer();
-
         document.getElementById('startBroadcast').style.display = 'none';
         document.getElementById('stopBroadcast').style.display = 'inline-block';
-        document.getElementById('offerSection').style.display = 'block';
+        document.getElementById('generateOfferSection').style.display = 'block';
         document.getElementById('answersSection').style.display = 'block';
         document.getElementById('broadcasterStats').style.display = 'flex';
         
-        showStatus('broadcasterStatus', '✅ Broadcasting started! Share your offer code with viewers.', 'alert-success');
+        showStatus('broadcasterStatus', '✅ Broadcasting started! Generate offers for viewers.', 'alert-success');
         updateBroadcastStatus('🟢');
 
       } catch (e) {
@@ -352,33 +348,73 @@
       }
     };
 
-    async function createBroadcastOffer() {
-      broadcasterPC = new RTCPeerConnection(config);
+    async function generateOfferForViewer() {
+      if (!localStream) {
+        alert('Start broadcasting first!');
+        return;
+      }
 
-      localStream.getTracks().forEach(track => {
-        broadcasterPC.addTrack(track, localStream);
-      });
+      try {
+        // Create new peer connection for this viewer
+        const pc = new RTCPeerConnection(config);
+        const viewerId = ++viewerCounter;
 
-      const offer = await broadcasterPC.createOffer();
-      await broadcasterPC.setLocalDescription(offer);
+        // Add tracks to peer connection
+        localStream.getTracks().forEach(track => {
+          console.log('Adding track to PC:', track.kind, track.id);
+          pc.addTrack(track, localStream);
+        });
 
-      // Wait for ICE gathering
-      await new Promise(resolve => {
-        if (broadcasterPC.iceGatheringState === 'complete') {
-          resolve();
-        } else {
-          broadcasterPC.addEventListener('icegatheringstatechange', () => {
-            if (broadcasterPC.iceGatheringState === 'complete') {
-              resolve();
-            }
-          });
-        }
-      });
+        // Create offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
 
-      document.getElementById('offerCode').value = JSON.stringify(broadcasterPC.localDescription);
+        // Wait for ICE gathering to complete
+        await new Promise(resolve => {
+          if (pc.iceGatheringState === 'complete') {
+            resolve();
+          } else {
+            pc.addEventListener('icegatheringstatechange', () => {
+              if (pc.iceGatheringState === 'complete') {
+                resolve();
+              }
+            });
+          }
+        });
+
+        // Store the pending connection
+        viewerConnections.set(viewerId, { pc, status: 'pending' });
+
+        // Display the offer
+        const offerData = {
+          viewerId: viewerId,
+          sdp: pc.localDescription
+        };
+        document.getElementById('generatedOffer').value = JSON.stringify(offerData);
+        document.getElementById('generatedOffer').style.display = 'block';
+        document.getElementById('copyOfferBtn').style.display = 'inline-block';
+
+        showStatus('broadcasterStatus', `✅ Offer generated for Viewer #${viewerId}. Copy and share it!`, 'alert-success');
+
+        // Set up connection state monitoring
+        pc.oniceconnectionstatechange = () => {
+          console.log(`Viewer #${viewerId} ICE state:`, pc.iceConnectionState);
+          const conn = viewerConnections.get(viewerId);
+          if (conn && pc.iceConnectionState === 'connected') {
+            conn.status = 'connected';
+            updateViewerList();
+          } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+            removeViewer(viewerId);
+          }
+        };
+
+      } catch (e) {
+        console.error('Error generating offer:', e);
+        showStatus('broadcasterStatus', `❌ Error: ${e.message}`, 'alert-warning');
+      }
     }
 
-    async function addViewer() {
+    async function connectViewer() {
       const answerText = document.getElementById('viewerAnswer').value.trim();
       if (!answerText) {
         alert('Please paste a viewer answer first!');
@@ -386,60 +422,57 @@
       }
 
       try {
-        const answer = JSON.parse(answerText);
-        
-        // Create new peer connection for this viewer
-        const viewerPC = new RTCPeerConnection(config);
-        
-        localStream.getTracks().forEach(track => {
-          viewerPC.addTrack(track, localStream);
-        });
+        const answerData = JSON.parse(answerText);
+        const viewerId = answerData.viewerId;
+        const answer = answerData.sdp;
 
-        const offer = await viewerPC.createOffer();
-        await viewerPC.setLocalDescription(offer);
+        const conn = viewerConnections.get(viewerId);
+        if (!conn) {
+          alert('Invalid viewer ID! Make sure you generated an offer for this viewer.');
+          return;
+        }
 
-        // Set viewer's answer
-        await viewerPC.setRemoteDescription(answer);
+        // Set the remote description (viewer's answer)
+        await conn.pc.setRemoteDescription(answer);
 
-        viewerPC.oniceconnectionstatechange = () => {
-          console.log('Viewer ICE state:', viewerPC.iceConnectionState);
-          if (viewerPC.iceConnectionState === 'disconnected' || 
-              viewerPC.iceConnectionState === 'failed') {
-            removeViewer(viewerPC);
-          }
-        };
-
-        viewerConnections.push({ pc: viewerPC, id: ++viewerCounter });
-        updateViewerList();
+        conn.status = 'connecting';
+        viewerConnections.set(viewerId, conn);
         
         document.getElementById('viewerAnswer').value = '';
-        showStatus('broadcasterStatus', `✅ Viewer #${viewerCounter} connected!`, 'alert-success');
+        showStatus('broadcasterStatus', `✅ Connecting to Viewer #${viewerId}...`, 'alert-success');
+        updateViewerList();
 
       } catch (e) {
-        console.error('Error adding viewer:', e);
+        console.error('Error connecting viewer:', e);
         alert('Invalid answer code! Please check and try again.');
       }
     }
 
     function updateViewerList() {
-      const count = viewerConnections.length;
-      document.getElementById('viewerCount').textContent = count;
+      const connections = Array.from(viewerConnections.values());
+      const connectedCount = connections.filter(c => c.status === 'connected').length;
       
-      if (count > 0) {
+      document.getElementById('viewerCount').textContent = connectedCount;
+      
+      if (connections.length > 0) {
         document.getElementById('viewerList').style.display = 'block';
-        document.getElementById('viewers').innerHTML = viewerConnections
-          .map(v => `<div class="viewer-item">👤 Viewer #${v.id}</div>`)
+        document.getElementById('viewers').innerHTML = Array.from(viewerConnections.entries())
+          .map(([id, conn]) => {
+            const statusIcon = conn.status === 'connected' ? '🟢' : 
+                              conn.status === 'connecting' ? '🟡' : '⚪';
+            return `<div class="viewer-item">${statusIcon} Viewer #${id} - ${conn.status}</div>`;
+          })
           .join('');
       } else {
         document.getElementById('viewerList').style.display = 'none';
       }
     }
 
-    function removeViewer(pc) {
-      const index = viewerConnections.findIndex(v => v.pc === pc);
-      if (index !== -1) {
-        viewerConnections.splice(index, 1);
-        pc.close();
+    function removeViewer(viewerId) {
+      const conn = viewerConnections.get(viewerId);
+      if (conn) {
+        conn.pc.close();
+        viewerConnections.delete(viewerId);
         updateViewerList();
       }
     }
@@ -449,19 +482,18 @@
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
       }
-      if (broadcasterPC) {
-        broadcasterPC.close();
-        broadcasterPC = null;
-      }
-      viewerConnections.forEach(v => v.pc.close());
-      viewerConnections.length = 0;
+      
+      viewerConnections.forEach(conn => conn.pc.close());
+      viewerConnections.clear();
 
       document.getElementById('broadcasterPreview').srcObject = null;
       document.getElementById('startBroadcast').style.display = 'inline-block';
       document.getElementById('stopBroadcast').style.display = 'none';
-      document.getElementById('offerSection').style.display = 'none';
+      document.getElementById('generateOfferSection').style.display = 'none';
       document.getElementById('answersSection').style.display = 'none';
       document.getElementById('broadcasterStats').style.display = 'none';
+      document.getElementById('generatedOffer').style.display = 'none';
+      document.getElementById('copyOfferBtn').style.display = 'none';
       
       showStatus('broadcasterStatus', 'ℹ️ Broadcasting stopped', 'alert-info');
       updateBroadcastStatus('⚪');
@@ -471,6 +503,8 @@
     document.getElementById('stopBroadcast').onclick = stopBroadcasting;
 
     // Viewer Functions
+    let viewerPC = null;
+
     async function connectToBroadcast() {
       const offerText = document.getElementById('broadcasterOffer').value.trim();
       if (!offerText) {
@@ -479,13 +513,17 @@
       }
 
       try {
-        const offer = JSON.parse(offerText);
+        const offerData = JSON.parse(offerText);
+        const viewerId = offerData.viewerId;
+        const offer = offerData.sdp;
         
         viewerPC = new RTCPeerConnection(config);
 
         viewerPC.ontrack = (e) => {
-          console.log('Received track:', e.streams[0]);
-          document.getElementById('remoteVideo').srcObject = e.streams[0];
+          console.log('Received track:', e.track.kind, e.streams[0]);
+          const remoteVideo = document.getElementById('remoteVideo');
+          remoteVideo.srcObject = e.streams[0];
+          
           document.getElementById('viewerStats').style.display = 'flex';
           updateConnectionStatus('🟢');
           showStatus('viewerStatus', '✅ Connected! Receiving broadcast...', 'alert-success');
@@ -523,7 +561,12 @@
           }
         });
 
-        document.getElementById('answerCode').value = JSON.stringify(viewerPC.localDescription);
+        const answerData = {
+          viewerId: viewerId,
+          sdp: viewerPC.localDescription
+        };
+
+        document.getElementById('answerCode').value = JSON.stringify(answerData);
         document.getElementById('answerSection').style.display = 'block';
         
         showStatus('viewerStatus', '📤 Answer ready! Send it back to the broadcaster.', 'alert-info');
