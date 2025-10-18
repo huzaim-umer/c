@@ -3,7 +3,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebRTC Screen Share (Manual SDP, Multi-session, Debug)</title>
+  <title>WebRTC Screen Share (Manual SDP, Multi-session, Reliable)</title>
   <style>
     body {
       font-family: sans-serif;
@@ -45,7 +45,7 @@
   </style>
 </head>
 <body>
-  <h2>WebRTC Screen Share (Manual SDP, Multi-session, Debug)</h2>
+  <h2>WebRTC Screen Share (Manual SDP, Multi-session, Reliable)</h2>
 
   <div id="sender">
     <button id="startShare">Start Screen Share</button>
@@ -68,9 +68,8 @@
   <script>
     const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     let pcSender = null, pcReceiver = null;
-    let stream = null; // Global stream variable for debug and reuse
+    let stream = null; // Global stream variable
 
-    // Utility to reset PeerConnection and stop tracks
     function resetPC(pc) {
       if(pc) {
         pc.getSenders().forEach(s => s.track && s.track.stop());
@@ -80,23 +79,40 @@
       return pc;
     }
 
-    // Sender side
+    // Sender
     document.getElementById('startShare').onclick = async () => {
-      pcSender = resetPC(pcSender);  // Close old connection if exists
-
+      pcSender = resetPC(pcSender);
       pcSender = new RTCPeerConnection(config);
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-      console.log('Captured stream:', stream); // Debug
 
-      stream.getTracks().forEach(t => pcSender.addTrack(t, stream));
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        if (!stream.getVideoTracks().length) {
+          alert('No video track captured! Make sure to select a screen/window.');
+          return;
+        }
+        console.log('Captured stream:', stream);
 
-      pcSender.onicecandidate = e => {
-        if (e.candidate) return;
-        document.getElementById('offer').value = JSON.stringify(pcSender.localDescription);
-      };
+        stream.getTracks().forEach(track => {
+          console.log('Adding track to pcSender:', track);
+          pcSender.addTrack(track, stream);
+        });
 
-      const offer = await pcSender.createOffer();
-      await pcSender.setLocalDescription(offer);
+        pcSender.onicecandidate = () => {
+          if(pcSender.iceGatheringState === 'complete') {
+            document.getElementById('offer').value = JSON.stringify(pcSender.localDescription);
+            console.log('Offer ready with ICE candidates');
+          }
+        };
+
+        pcSender.oniceconnectionstatechange = () => {
+          console.log('Sender ICE state:', pcSender.iceConnectionState);
+        };
+
+        const offer = await pcSender.createOffer();
+        await pcSender.setLocalDescription(offer);
+      } catch(e) {
+        console.error('Error capturing display:', e);
+      }
     };
 
     document.getElementById('setAnswer').onclick = async () => {
@@ -106,14 +122,18 @@
       alert('✅ Connection established!');
     };
 
-    // Receiver side
+    // Receiver
     document.getElementById('createAnswer').onclick = async () => {
-      pcReceiver = resetPC(pcReceiver);  // Close old connection if exists
+      pcReceiver = resetPC(pcReceiver);
       pcReceiver = new RTCPeerConnection(config);
 
       pcReceiver.ontrack = e => {
-        console.log('Track received on receiver:', e.streams[0]); // Debug
+        console.log('Received track on receiver:', e.streams[0]);
         document.getElementById('remoteVideo').srcObject = e.streams[0];
+      };
+
+      pcReceiver.oniceconnectionstatechange = () => {
+        console.log('Receiver ICE state:', pcReceiver.iceConnectionState);
       };
 
       const offer = JSON.parse(document.getElementById('remoteOffer').value);
@@ -122,9 +142,11 @@
       const answer = await pcReceiver.createAnswer();
       await pcReceiver.setLocalDescription(answer);
 
-      pcReceiver.onicecandidate = e => {
-        if (e.candidate) return;
-        document.getElementById('localAnswer').value = JSON.stringify(pcReceiver.localDescription);
+      pcReceiver.onicecandidate = () => {
+        if(pcReceiver.iceGatheringState === 'complete') {
+          document.getElementById('localAnswer').value = JSON.stringify(pcReceiver.localDescription);
+          console.log('Answer ready with ICE candidates');
+        }
       };
     };
   </script>
