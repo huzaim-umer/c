@@ -1,155 +1,565 @@
 <!DOCTYPE html>
-
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebRTC Screen Share (Manual SDP, Multi-session, Reliable)</title>
+  <title>WebRTC Screen Broadcast</title>
   <style>
     body {
-      font-family: sans-serif;
-      background: #121212;
-      color: #f5f5f5;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      margin: 0;
       padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2.5em;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .subtitle {
+      text-align: center;
+      opacity: 0.9;
+      margin-bottom: 30px;
+    }
+    .mode-selector {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .mode-btn {
+      padding: 15px 40px;
+      font-size: 1.2em;
+      border: 3px solid #fff;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border-radius: 15px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: bold;
+    }
+    .mode-btn:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-2px);
+    }
+    .mode-btn.active {
+      background: #fff;
+      color: #667eea;
+    }
+    .panel {
+      background: rgba(255,255,255,0.95);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 20px;
+      color: #333;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      display: none;
+    }
+    .panel.active {
+      display: block;
+    }
+    .section {
+      margin-bottom: 25px;
+    }
+    .section h3 {
+      color: #667eea;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .step-number {
+      background: #667eea;
+      color: #fff;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
     }
     textarea {
-      width: 90%;
-      height: 120px;
-      margin: 8px 0;
-      background: #1e1e1e;
-      color: #00ff90;
-      border: 1px solid #333;
-      padding: 8px;
-      border-radius: 6px;
-    }
-    video {
-      width: 90%;
-      max-width: 600px;
-      margin-top: 15px;
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      border: 2px solid #ddd;
       border-radius: 10px;
-      border: 2px solid #333;
-      background: black;
+      font-family: monospace;
+      font-size: 0.9em;
+      resize: vertical;
+      box-sizing: border-box;
+      background: #f8f9fa;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
     }
     button {
-      margin: 6px;
-      padding: 10px 18px;
-      background: #00ff90;
+      padding: 12px 25px;
+      margin: 5px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       border: none;
-      border-radius: 5px;
-      color: black;
+      border-radius: 10px;
+      color: white;
       font-weight: bold;
       cursor: pointer;
+      font-size: 1em;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .video-container {
+      margin-top: 20px;
+      text-align: center;
+    }
+    video {
+      width: 100%;
+      max-width: 800px;
+      border-radius: 15px;
+      background: #000;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .stats {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 15px 20px;
+      border-radius: 10px;
+      flex: 1;
+      min-width: 150px;
+      text-align: center;
+      color: #fff;
+    }
+    .stat-label {
+      font-size: 0.9em;
+      opacity: 0.9;
+      margin-bottom: 5px;
+    }
+    .stat-value {
+      font-size: 1.5em;
+      font-weight: bold;
+    }
+    .alert {
+      padding: 12px 20px;
+      border-radius: 10px;
+      margin: 10px 0;
+      font-weight: 500;
+    }
+    .alert-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .alert-info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    .alert-warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .copy-btn {
+      background: #28a745;
+      font-size: 0.9em;
+      padding: 8px 15px;
+    }
+    .viewer-list {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+    .viewer-item {
+      padding: 8px;
+      background: white;
+      margin: 5px 0;
+      border-radius: 5px;
+      border-left: 4px solid #667eea;
     }
   </style>
 </head>
 <body>
-  <h2>WebRTC Screen Share (Manual SDP, Multi-session, Reliable)</h2>
+  <div class="container">
+    <h1>📡 WebRTC Screen Broadcast</h1>
+    <p class="subtitle">Share your screen with multiple viewers in real-time</p>
 
-  <div id="sender">
-    <button id="startShare">Start Screen Share</button>
-    <p>Step 1: Copy this Offer and send it to the Viewer:</p>
-    <textarea id="offer"></textarea>
-    <p>Step 2: Paste the Viewer’s Answer here:</p>
-    <textarea id="answer"></textarea>
-    <button id="setAnswer">Set Answer</button>
-  </div>
+    <div class="mode-selector">
+      <button class="mode-btn active" onclick="switchMode('broadcaster')">🎥 Broadcaster</button>
+      <button class="mode-btn" onclick="switchMode('viewer')">👁️ Viewer</button>
+    </div>
 
-  <div id="receiver">
-    <p>Step 1: Paste Sender’s Offer here:</p>
-    <textarea id="remoteOffer"></textarea>
-    <button id="createAnswer">Create Answer</button>
-    <p>Step 2: Copy this Answer and send it back:</p>
-    <textarea id="localAnswer"></textarea>
-    <video id="remoteVideo" autoplay playsinline></video>
+    <!-- Broadcaster Panel -->
+    <div id="broadcasterPanel" class="panel active">
+      <div class="section">
+        <h3><span class="step-number">1</span> Start Broadcasting</h3>
+        <button id="startBroadcast">🎬 Start Screen Share</button>
+        <button id="stopBroadcast" style="background: #dc3545; display: none;">⏹️ Stop Broadcasting</button>
+        <div id="broadcasterStatus"></div>
+      </div>
+
+      <div class="section" id="offerSection" style="display: none;">
+        <h3><span class="step-number">2</span> Share This Offer Code</h3>
+        <div class="alert alert-info">
+          📋 Copy this code and share it with viewers (via chat, email, etc.)
+        </div>
+        <textarea id="offerCode" readonly></textarea>
+        <button class="copy-btn" onclick="copyToClipboard('offerCode')">📋 Copy Offer</button>
+      </div>
+
+      <div class="section" id="answersSection" style="display: none;">
+        <h3><span class="step-number">3</span> Add Viewer Answers</h3>
+        <div class="alert alert-info">
+          🔗 When viewers send you their answer codes, paste them here one at a time
+        </div>
+        <textarea id="viewerAnswer" placeholder="Paste viewer's answer code here..."></textarea>
+        <button onclick="addViewer()">➕ Connect Viewer</button>
+        
+        <div class="viewer-list" id="viewerList" style="display: none;">
+          <strong>Connected Viewers:</strong>
+          <div id="viewers"></div>
+        </div>
+      </div>
+
+      <div class="video-container">
+        <video id="broadcasterPreview" autoplay playsinline muted></video>
+      </div>
+
+      <div class="stats" id="broadcasterStats" style="display: none;">
+        <div class="stat-card">
+          <div class="stat-label">Connected Viewers</div>
+          <div class="stat-value" id="viewerCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Broadcast Status</div>
+          <div class="stat-value" id="broadcastStatus">●</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Viewer Panel -->
+    <div id="viewerPanel" class="panel">
+      <div class="section">
+        <h3><span class="step-number">1</span> Paste Broadcaster's Offer</h3>
+        <div class="alert alert-info">
+          📥 Get the offer code from the broadcaster and paste it below
+        </div>
+        <textarea id="broadcasterOffer" placeholder="Paste offer code here..."></textarea>
+        <button onclick="connectToBroadcast()">🔗 Connect to Broadcast</button>
+      </div>
+
+      <div class="section" id="answerSection" style="display: none;">
+        <h3><span class="step-number">2</span> Send This Answer Back</h3>
+        <div class="alert alert-success">
+          ✅ Your answer code is ready! Copy and send it back to the broadcaster
+        </div>
+        <textarea id="answerCode" readonly></textarea>
+        <button class="copy-btn" onclick="copyToClipboard('answerCode')">📋 Copy Answer</button>
+      </div>
+
+      <div id="viewerStatus"></div>
+
+      <div class="video-container">
+        <video id="remoteVideo" autoplay playsinline muted></video>
+      </div>
+
+      <div class="stats" id="viewerStats" style="display: none;">
+        <div class="stat-card">
+          <div class="stat-label">Connection Status</div>
+          <div class="stat-value" id="connectionStatus">⚪</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Video Quality</div>
+          <div class="stat-value" id="videoQuality">--</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
     const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    let pcSender = null, pcReceiver = null;
-    let stream = null; // Global stream variable
+    let broadcasterPC = null;
+    let localStream = null;
+    const viewerConnections = [];
+    let viewerPC = null;
+    let viewerCounter = 0;
 
-    function resetPC(pc) {
-      if(pc) {
-        pc.getSenders().forEach(s => s.track && s.track.stop());
-        pc.close();
-        return null;
-      }
-      return pc;
+    // Mode switching
+    function switchMode(mode) {
+      document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      document.getElementById('broadcasterPanel').classList.toggle('active', mode === 'broadcaster');
+      document.getElementById('viewerPanel').classList.toggle('active', mode === 'viewer');
     }
 
-    // Sender
-    document.getElementById('startShare').onclick = async () => {
-      pcSender = resetPC(pcSender);
-      pcSender = new RTCPeerConnection(config);
-
+    // Broadcaster Functions
+    document.getElementById('startBroadcast').onclick = async () => {
       try {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-        if (!stream.getVideoTracks().length) {
-          alert('No video track captured! Make sure to select a screen/window.');
-          return;
-        }
-        console.log('Captured stream:', stream);
-
-        stream.getTracks().forEach(track => {
-          console.log('Adding track to pcSender:', track);
-          pcSender.addTrack(track, stream);
+        localStream = await navigator.mediaDevices.getDisplayMedia({ 
+          video: { displaySurface: 'monitor' }, 
+          audio: true 
         });
 
-        pcSender.onicecandidate = () => {
-          if(pcSender.iceGatheringState === 'complete') {
-            document.getElementById('offer').value = JSON.stringify(pcSender.localDescription);
-            console.log('Offer ready with ICE candidates');
+        if (!localStream.getVideoTracks().length) {
+          showStatus('broadcasterStatus', '❌ No video track captured!', 'alert-warning');
+          return;
+        }
+
+        // Preview
+        document.getElementById('broadcasterPreview').srcObject = localStream;
+
+        // Handle user stopping share
+        localStream.getVideoTracks()[0].addEventListener('ended', () => {
+          stopBroadcasting();
+        });
+
+        // Create offer for viewers
+        await createBroadcastOffer();
+
+        document.getElementById('startBroadcast').style.display = 'none';
+        document.getElementById('stopBroadcast').style.display = 'inline-block';
+        document.getElementById('offerSection').style.display = 'block';
+        document.getElementById('answersSection').style.display = 'block';
+        document.getElementById('broadcasterStats').style.display = 'flex';
+        
+        showStatus('broadcasterStatus', '✅ Broadcasting started! Share your offer code with viewers.', 'alert-success');
+        updateBroadcastStatus('🟢');
+
+      } catch (e) {
+        console.error('Error starting broadcast:', e);
+        showStatus('broadcasterStatus', `❌ Error: ${e.message}`, 'alert-warning');
+      }
+    };
+
+    async function createBroadcastOffer() {
+      broadcasterPC = new RTCPeerConnection(config);
+
+      localStream.getTracks().forEach(track => {
+        broadcasterPC.addTrack(track, localStream);
+      });
+
+      const offer = await broadcasterPC.createOffer();
+      await broadcasterPC.setLocalDescription(offer);
+
+      // Wait for ICE gathering
+      await new Promise(resolve => {
+        if (broadcasterPC.iceGatheringState === 'complete') {
+          resolve();
+        } else {
+          broadcasterPC.addEventListener('icegatheringstatechange', () => {
+            if (broadcasterPC.iceGatheringState === 'complete') {
+              resolve();
+            }
+          });
+        }
+      });
+
+      document.getElementById('offerCode').value = JSON.stringify(broadcasterPC.localDescription);
+    }
+
+    async function addViewer() {
+      const answerText = document.getElementById('viewerAnswer').value.trim();
+      if (!answerText) {
+        alert('Please paste a viewer answer first!');
+        return;
+      }
+
+      try {
+        const answer = JSON.parse(answerText);
+        
+        // Create new peer connection for this viewer
+        const viewerPC = new RTCPeerConnection(config);
+        
+        localStream.getTracks().forEach(track => {
+          viewerPC.addTrack(track, localStream);
+        });
+
+        const offer = await viewerPC.createOffer();
+        await viewerPC.setLocalDescription(offer);
+
+        // Set viewer's answer
+        await viewerPC.setRemoteDescription(answer);
+
+        viewerPC.oniceconnectionstatechange = () => {
+          console.log('Viewer ICE state:', viewerPC.iceConnectionState);
+          if (viewerPC.iceConnectionState === 'disconnected' || 
+              viewerPC.iceConnectionState === 'failed') {
+            removeViewer(viewerPC);
           }
         };
 
-        pcSender.oniceconnectionstatechange = () => {
-          console.log('Sender ICE state:', pcSender.iceConnectionState);
+        viewerConnections.push({ pc: viewerPC, id: ++viewerCounter });
+        updateViewerList();
+        
+        document.getElementById('viewerAnswer').value = '';
+        showStatus('broadcasterStatus', `✅ Viewer #${viewerCounter} connected!`, 'alert-success');
+
+      } catch (e) {
+        console.error('Error adding viewer:', e);
+        alert('Invalid answer code! Please check and try again.');
+      }
+    }
+
+    function updateViewerList() {
+      const count = viewerConnections.length;
+      document.getElementById('viewerCount').textContent = count;
+      
+      if (count > 0) {
+        document.getElementById('viewerList').style.display = 'block';
+        document.getElementById('viewers').innerHTML = viewerConnections
+          .map(v => `<div class="viewer-item">👤 Viewer #${v.id}</div>`)
+          .join('');
+      } else {
+        document.getElementById('viewerList').style.display = 'none';
+      }
+    }
+
+    function removeViewer(pc) {
+      const index = viewerConnections.findIndex(v => v.pc === pc);
+      if (index !== -1) {
+        viewerConnections.splice(index, 1);
+        pc.close();
+        updateViewerList();
+      }
+    }
+
+    function stopBroadcasting() {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      if (broadcasterPC) {
+        broadcasterPC.close();
+        broadcasterPC = null;
+      }
+      viewerConnections.forEach(v => v.pc.close());
+      viewerConnections.length = 0;
+
+      document.getElementById('broadcasterPreview').srcObject = null;
+      document.getElementById('startBroadcast').style.display = 'inline-block';
+      document.getElementById('stopBroadcast').style.display = 'none';
+      document.getElementById('offerSection').style.display = 'none';
+      document.getElementById('answersSection').style.display = 'none';
+      document.getElementById('broadcasterStats').style.display = 'none';
+      
+      showStatus('broadcasterStatus', 'ℹ️ Broadcasting stopped', 'alert-info');
+      updateBroadcastStatus('⚪');
+      updateViewerList();
+    }
+
+    document.getElementById('stopBroadcast').onclick = stopBroadcasting;
+
+    // Viewer Functions
+    async function connectToBroadcast() {
+      const offerText = document.getElementById('broadcasterOffer').value.trim();
+      if (!offerText) {
+        alert('Please paste the broadcaster\'s offer first!');
+        return;
+      }
+
+      try {
+        const offer = JSON.parse(offerText);
+        
+        viewerPC = new RTCPeerConnection(config);
+
+        viewerPC.ontrack = (e) => {
+          console.log('Received track:', e.streams[0]);
+          document.getElementById('remoteVideo').srcObject = e.streams[0];
+          document.getElementById('viewerStats').style.display = 'flex';
+          updateConnectionStatus('🟢');
+          showStatus('viewerStatus', '✅ Connected! Receiving broadcast...', 'alert-success');
         };
 
-        const offer = await pcSender.createOffer();
-        await pcSender.setLocalDescription(offer);
-      } catch(e) {
-        console.error('Error capturing display:', e);
+        viewerPC.oniceconnectionstatechange = () => {
+          console.log('Viewer ICE state:', viewerPC.iceConnectionState);
+          const state = viewerPC.iceConnectionState;
+          
+          if (state === 'connected') {
+            updateConnectionStatus('🟢');
+          } else if (state === 'checking') {
+            updateConnectionStatus('🟡');
+          } else if (state === 'disconnected' || state === 'failed') {
+            updateConnectionStatus('🔴');
+            showStatus('viewerStatus', '❌ Connection lost', 'alert-warning');
+          }
+        };
+
+        await viewerPC.setRemoteDescription(offer);
+
+        const answer = await viewerPC.createAnswer();
+        await viewerPC.setLocalDescription(answer);
+
+        // Wait for ICE gathering
+        await new Promise(resolve => {
+          if (viewerPC.iceGatheringState === 'complete') {
+            resolve();
+          } else {
+            viewerPC.addEventListener('icegatheringstatechange', () => {
+              if (viewerPC.iceGatheringState === 'complete') {
+                resolve();
+              }
+            });
+          }
+        });
+
+        document.getElementById('answerCode').value = JSON.stringify(viewerPC.localDescription);
+        document.getElementById('answerSection').style.display = 'block';
+        
+        showStatus('viewerStatus', '📤 Answer ready! Send it back to the broadcaster.', 'alert-info');
+
+      } catch (e) {
+        console.error('Error connecting:', e);
+        showStatus('viewerStatus', `❌ Error: ${e.message}`, 'alert-warning');
       }
-    };
+    }
 
-    document.getElementById('setAnswer').onclick = async () => {
-      if(!pcSender) { alert('Start screen share first!'); return; }
-      const answer = JSON.parse(document.getElementById('answer').value);
-      await pcSender.setRemoteDescription(answer);
-      alert('✅ Connection established!');
-    };
+    // Helper Functions
+    function copyToClipboard(elementId) {
+      const element = document.getElementById(elementId);
+      element.select();
+      document.execCommand('copy');
+      
+      const btn = event.target;
+      const originalText = btn.textContent;
+      btn.textContent = '✅ Copied!';
+      setTimeout(() => {
+        btn.textContent = originalText;
+      }, 2000);
+    }
 
-    // Receiver
-    document.getElementById('createAnswer').onclick = async () => {
-      pcReceiver = resetPC(pcReceiver);
-      pcReceiver = new RTCPeerConnection(config);
+    function showStatus(elementId, message, alertClass) {
+      const element = document.getElementById(elementId);
+      element.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+    }
 
-      pcReceiver.ontrack = e => {
-        console.log('Received track on receiver:', e.streams[0]);
-        document.getElementById('remoteVideo').srcObject = e.streams[0];
-      };
+    function updateBroadcastStatus(status) {
+      document.getElementById('broadcastStatus').textContent = status;
+    }
 
-      pcReceiver.oniceconnectionstatechange = () => {
-        console.log('Receiver ICE state:', pcReceiver.iceConnectionState);
-      };
-
-      const offer = JSON.parse(document.getElementById('remoteOffer').value);
-      await pcReceiver.setRemoteDescription(offer);
-
-      const answer = await pcReceiver.createAnswer();
-      await pcReceiver.setLocalDescription(answer);
-
-      pcReceiver.onicecandidate = () => {
-        if(pcReceiver.iceGatheringState === 'complete') {
-          document.getElementById('localAnswer').value = JSON.stringify(pcReceiver.localDescription);
-          console.log('Answer ready with ICE candidates');
-        }
-      };
-    };
+    function updateConnectionStatus(status) {
+      document.getElementById('connectionStatus').textContent = status;
+    }
   </script>
-
 </body>
 </html>
