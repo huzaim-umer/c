@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>WebRTC Screen Share (Manual SDP)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #121212;
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    textarea {
+      width: 90%;
+      height: 120px;
+      margin: 8px 0;
+      background: #1e1e1e;
+      color: #00ff90;
+      border: 1px solid #333;
+      padding: 8px;
+      border-radius: 6px;
+    }
+    video {
+      width: 90%;
+      max-width: 600px;
+      margin-top: 15px;
+      border-radius: 10px;
+      border: 2px solid #333;
+      background: black;
+    }
+    button {
+      margin: 6px;
+      padding: 10px 18px;
+      background: #00ff90;
+      border: none;
+      border-radius: 5px;
+      color: black;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>WebRTC Screen Share (Manual SDP)</h2>
+
+  <div id="sender">
+    <button id="startShare">Start Screen Share</button>
+    <p>Step 1: Copy this Offer and send it to the Viewer:</p>
+    <textarea id="offer"></textarea>
+    <p>Step 2: Paste the Viewer’s Answer here:</p>
+    <textarea id="answer"></textarea>
+    <button id="setAnswer">Set Answer</button>
+  </div>
+
+  <div id="receiver">
+    <p>Step 1: Paste Sender’s Offer here:</p>
+    <textarea id="remoteOffer"></textarea>
+    <button id="createAnswer">Create Answer</button>
+    <p>Step 2: Copy this Answer and send it back:</p>
+    <textarea id="localAnswer"></textarea>
+    <video id="remoteVideo" autoplay playsinline></video>
+  </div>
+
+  <script>
+    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    let pcSender, pcReceiver;
+
+    // Sender side
+    document.getElementById('startShare').onclick = async () => {
+      pcSender = new RTCPeerConnection(config);
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      stream.getTracks().forEach(t => pcSender.addTrack(t, stream));
+      pcSender.onicecandidate = e => {
+        if (e.candidate) return;
+        document.getElementById('offer').value = JSON.stringify(pcSender.localDescription);
+      };
+      const offer = await pcSender.createOffer();
+      await pcSender.setLocalDescription(offer);
+    };
+
+    document.getElementById('setAnswer').onclick = async () => {
+      const answer = JSON.parse(document.getElementById('answer').value);
+      await pcSender.setRemoteDescription(answer);
+      alert('✅ Connection established!');
+    };
+
+    // Receiver side
+    document.getElementById('createAnswer').onclick = async () => {
+      pcReceiver = new RTCPeerConnection(config);
+      pcReceiver.ontrack = e => {
+        document.getElementById('remoteVideo').srcObject = e.streams[0];
+      };
+      const offer = JSON.parse(document.getElementById('remoteOffer').value);
+      await pcReceiver.setRemoteDescription(offer);
+      const answer = await pcReceiver.createAnswer();
+      await pcReceiver.setLocalDescription(answer);
+      pcReceiver.onicecandidate = e => {
+        if (e.candidate) return;
+        document.getElementById('localAnswer').value = JSON.stringify(pcReceiver.localDescription);
+      };
+    };
+  </script>
+</body>
+</html>
