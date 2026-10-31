@@ -4,7 +4,7 @@
   "private": true,
   "description": "Zero-SMS live queue for barbershops: live link + shop TV + one-tap barber panel.",
   "type": "module",
-  "engines": { "node": ">=22.5" },
+  "engines": { "node": ">=22.13" },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "add-shop": "node --disable-warning=ExperimentalWarning scripts/add-shop.js",

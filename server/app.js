@@ -31,7 +31,7 @@ function readForm(req, limit = 2048) {
   });
 }
 
-export function createApp({ db, secret, secureCookies = false, baseUrl, now = Date.now }) {
+export function createApp({ db, secret, secureCookies = false, baseUrl, trustProxy = false, now = Date.now }) {
   const queue = createQueue(db, now);
   const hub = createHub();
   const signer = createSigner(secret);
@@ -125,7 +125,9 @@ export function createApp({ db, secret, secureCookies = false, baseUrl, now = Da
     // ----- Barber -----
     if (area === 'b') {
       if (post && action === 'login') {
-        const key = `${shop.id}|${req.socket.remoteAddress}`;
+        // Behind Render/Cloudflare every request comes from the proxy; use the real client IP.
+        const ip = (trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress;
+        const key = `${shop.id}|${ip}`;
         if (limiter.blocked(key)) return send(req, res, 429, V.loginPage({ shop, error: '5 منٹ بعد کوشش کریں · Try again in 5 minutes' }));
         const form = await readForm(req);
         if (!checkPin(form.get('pin') || '', shop.pin_hash)) {

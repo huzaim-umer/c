@@ -12,10 +12,11 @@ Message cost is Rs. 0 per customer. The customer page is about 1.6 KB, so it wor
 
 - How it works: [docs/FLOW.md](docs/FLOW.md) (flow diagrams + business rules)
 - Roadmap: [PLAN.md](PLAN.md)
+- **Deploy free on Render:** [docs/DEPLOY-RENDER.md](docs/DEPLOY-RENDER.md)
 
 ## Run it
 
-Needs **Node.js 22.5+**. There's nothing to `npm install`.
+Needs **Node.js 22.13+**. There's nothing to `npm install`.
 
 ```bash
 npm run demo        # creates shop "demo" with PIN 1234
@@ -44,6 +45,8 @@ npm run add-shop -- shah-g "Shah G Hair Salon" "شاہ جی ہیئر سیلون"
 | `SESSION_SECRET` | long random string | Keeps barbers logged in across restarts |
 | `COOKIE_SECURE` | `1` | Set when served over HTTPS |
 | `DB_FILE` | `/var/lib/ustaad/ustaad.db` | SQLite file location |
+| `SHOPS` | `demo \| Ustaad Salon \| استاد سیلون \| 1234` | Shops to create/update on startup (one per line) |
+| `TRUST_PROXY` | `1` | Behind a proxy: use the real client IP for the login lock (automatic on Render) |
 
 ## Test
 

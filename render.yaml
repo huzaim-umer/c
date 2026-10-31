@@ -1,0 +1,21 @@
+# Render Blueprint: Dashboard → New → Blueprint → pick this repo + branch "Barber".
+services:
+  - type: web
+    name: ustaad
+    runtime: node
+    plan: free
+    branch: Barber
+    buildCommand: npm test
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: SESSION_SECRET
+        generateValue: true
+      # Free tier wipes the disk on restart, so shops are re-created from here on every start.
+      # One per line:  slug | Name | Urdu name | PIN
+      - key: SHOPS
+        sync: false

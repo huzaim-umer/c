@@ -42,6 +42,7 @@ export function createQueue(db, now = Date.now) {
     shopBySlug: q('SELECT * FROM shops WHERE slug = ?'),
     shopById: q('SELECT * FROM shops WHERE id = ?'),
     createShop: q('INSERT INTO shops (slug, name, name_ur, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)'),
+    updateShop: q('UPDATE shops SET name = ?, name_ur = ?, pin_hash = ? WHERE id = ?'),
     setOpen: q('UPDATE shops SET is_open = ? WHERE id = ?'),
     setAvg: q('UPDATE shops SET avg_service_sec = ? WHERE id = ?'),
     serving: q("SELECT * FROM tokens WHERE shop_id = ? AND day = ? AND status = 'serving'"),
@@ -135,6 +136,8 @@ export function createQueue(db, now = Date.now) {
         return Boolean(cur || nxt);
       });
     },
+
+    updateShop(shopId, { name, nameUr = null, pinHash }) { S.updateShop.run(name, nameUr, pinHash, shopId); },
 
     setOpen(shopId, open) { S.setOpen.run(open ? 1 : 0, shopId); },
   };
