@@ -1,0 +1,14 @@
+{
+  "name": "ustaad",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zero-SMS live queue for barbershops: live link + shop TV + one-tap barber panel.",
+  "type": "module",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "add-shop": "node --disable-warning=ExperimentalWarning scripts/add-shop.js",
+    "demo": "node --disable-warning=ExperimentalWarning scripts/add-shop.js demo \"Ustaad Hair Salon\" \"استاد ہیئر سیلون\" 1234",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}

@@ -40,8 +40,8 @@ Copying the QLess / Waitwise model: no SMS or WhatsApp. The customer keeps a **l
 
 ## 3. Tech stack (cheap, simple)
 
-- **Backend:** Node.js + Hono (or Fastify), one process.
-- **DB:** SQLite (`better-sqlite3`). Plenty for hundreds of shops. Move to Postgres later.
+- **Backend:** Node.js 22 built-in `http`, one process, no npm packages.
+- **DB:** SQLite (built into Node 22). Plenty for hundreds of shops. Move to Postgres later.
 - **Realtime:** SSE (lighter than WebSockets and works through proxies).
 - **Push:** `web-push` library with VAPID keys.
 - **Hosting:** one Rs. ~1500/month VPS (Hetzner/DO) + Cloudflare in front (free CDN, TLS, cheap in PK).
@@ -64,15 +64,18 @@ Token numbers reset daily.
 | **P3 – Billing & admin** (1 wk) | Rs. 999/month flat, JazzCash/Easypaisa, admin dashboard, daily stats | Revenue |
 | **P4 – Polish** | Offline-tolerant barber panel, PWA install, multiple barbers per shop, analytics (peak hours) | Retention |
 
-## 5. Repo layout (proposed)
+## 5. Repo layout
 
 ```
-/server     Hono app, routes, SSE hub, push sender
-/views      HTML templates (live, barber, tv) – inline CSS/JS
-/db         schema.sql, migrations
-/scripts    size-budget check, seed demo shop
-PLAN.md
+/server          app.js (routes), queue.js (business rules), hub.js (live updates),
+                 auth.js (PIN), views.js (HTML pages), i18n.js (Urdu/English), db.js (SQLite)
+/server/vendor   qrcode.cjs (MIT): QR drawn on the server, no CDN needed
+/scripts         add-shop.js
+/test            business-rule tests + full HTTP flow test (incl. 15 KB page budget)
+/docs            FLOW.md (diagrams), screenshots
 ```
+
+Zero npm dependencies: Node 22 already includes the HTTP server, SQLite, and crypto.
 
 ## 6. Risks and answers
 
